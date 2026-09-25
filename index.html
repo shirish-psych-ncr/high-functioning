@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- Allow pinch-zoom for accessibility (WCAG 1.4.4); keep notch-safe viewport-fit -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="A presentation on the hidden cognitive and psychological costs of high performance, clinical formulation, and evidence-based recovery.">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0f172a">
@@ -22,6 +24,8 @@
             --translation-bg: rgba(148, 163, 184, 0.08);
             --translation-border: #94a3b8;
             --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-top: env(safe-area-inset-top, 0px);
+            --controls-h: 4.5rem; /* reserve space for the fixed control bar */
         }
 
         * {
@@ -37,22 +41,31 @@
             background-color: var(--bg-primary);
             color: var(--text-primary);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            user-select: none;
+            /* Text inside slides stays selectable so users can copy it */
             -webkit-user-select: none;
-            touch-action: manipulation;
+            user-select: none;
+            touch-action: manipulation; /* suppresses double-tap zoom delay on controls */
         }
 
-        /* Navigation Zones */
+        .slide-content, .slide-content * {
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        /* Navigation zones: mouse click targets, layered below slides.
+           Touch is handled by the unified pointer controller instead. */
         .nav-zone {
             position: absolute;
             top: 0;
             bottom: 0;
             width: 50%;
-            z-index: 10;
-            cursor: pointer;
+            z-index: 0;           /* below slides: text stays selectable/scrollable */
+            cursor: pointer;      /* desktop-only convenience click targets */
+            pointer-events: none; /* enabled for mouse users only, via JS */
         }
         .nav-zone.left { left: 0; }
         .nav-zone.right { right: 0; }
+        body.has-mouse .nav-zone { pointer-events: auto; }
 
         /* Slide Container */
         .presentation-container {
@@ -64,27 +77,32 @@
 
         .slide {
             position: absolute;
-            top: 0;
-            left: 0;
+            inset: 0;
             width: 100%;
             height: 100dvh;
-            padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 4rem) calc(6rem + var(--safe-bottom)) clamp(1rem, 4vw, 4rem);
-            display: none;
+            padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 4rem)
+                     calc(var(--controls-h) + 1.5rem + var(--safe-bottom))
+                     clamp(1rem, 4vw, 4rem);
+            display: flex;
             flex-direction: column;
+            visibility: hidden;
             opacity: 0;
             transform: translateX(20px);
-            transition: opacity 0.3s ease, transform 0.3s ease;
+            /* Animate only compositor-friendly properties */
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0.3s;
             overflow-y: auto;
             overscroll-behavior-y: contain;
             -webkit-overflow-scrolling: touch;
             touch-action: pan-y;
             z-index: 1;
+            will-change: opacity, transform;
         }
 
         .slide.active {
-            display: flex;
+            visibility: visible;
             opacity: 1;
             transform: translateX(0);
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s;
             z-index: 5;
         }
 
@@ -95,9 +113,9 @@
             flex: 1;
         }
 
-        /* Typography */
+        /* Typography — fluid sizes with clamp() for all screen widths */
         h1 {
-            font-size: clamp(1.4rem, 4vw, 2.2rem);
+            font-size: clamp(1.4rem, 1rem + 2.5vw, 2.2rem);
             font-weight: 700;
             color: var(--accent-color);
             margin-bottom: 1.5rem;
@@ -105,10 +123,11 @@
             padding-bottom: 0.8rem;
             letter-spacing: -0.5px;
             line-height: 1.2;
+            overflow-wrap: anywhere; /* prevent long words from causing horizontal scroll */
         }
 
         h2 {
-            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+            font-size: clamp(0.9rem, 0.8rem + 0.6vw, 1.1rem);
             font-weight: 600;
             color: var(--accent-color);
             margin-top: 1.2rem;
@@ -118,7 +137,7 @@
         }
 
         .question-text {
-            font-size: clamp(1rem, 3vw, 1.2rem);
+            font-size: clamp(1rem, 0.9rem + 0.6vw, 1.2rem);
             font-style: italic;
             color: var(--text-secondary);
             margin-bottom: 1.2rem;
@@ -135,7 +154,8 @@
             line-height: 1.6;
             color: var(--text-secondary);
             position: relative;
-            font-size: clamp(0.9rem, 2.5vw, 1.05rem);
+            font-size: clamp(0.9rem, 0.85rem + 0.35vw, 1.05rem);
+            overflow-wrap: anywhere;
         }
 
         li::before {
@@ -198,6 +218,7 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid var(--bg-accent);
+            max-width: min(92vw, 480px);
         }
 
         button {
@@ -209,17 +230,30 @@
             font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
-            min-width: 44px;
+            transition: background-color 0.2s ease, color 0.2s ease, transform 0.1s ease;
+            min-width: 44px;   /* touch-target minimum (WCAG 2.5.5) */
             min-height: 44px;
             display: flex;
             align-items: center;
             justify-content: center;
+            touch-action: manipulation;
         }
 
-        button:hover, button:active {
+        button:hover:not(:disabled),
+        button:focus-visible:not(:disabled) {
             background: var(--accent-color);
             color: var(--bg-primary);
+        }
+
+        button:active:not(:disabled) {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            transform: scale(0.97);
+        }
+
+        button:focus-visible {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
         }
 
         button:disabled {
@@ -243,13 +277,17 @@
         .progress-bar {
             height: 100%;
             background: var(--accent-color);
-            width: 0%;
-            transition: width 0.3s ease;
+            /* GPU-accelerated width animation instead of layout-thrashing width% */
+            width: 100%;
+            transform-origin: left center;
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+            will-change: transform;
         }
 
         .slide-counter {
             position: fixed;
-            top: calc(15px + env(safe-area-inset-top, 0px));
+            top: calc(15px + var(--safe-top));
             right: 20px;
             font-size: 0.85rem;
             color: var(--text-muted);
@@ -259,6 +297,8 @@
             padding: 4px 10px;
             border-radius: 12px;
             backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            font-variant-numeric: tabular-nums; /* prevents counter jitter */
         }
 
         /* Scrollbar styling */
@@ -266,15 +306,22 @@
         .slide::-webkit-scrollbar-track { background: transparent; }
         .slide::-webkit-scrollbar-thumb { background: var(--bg-accent); border-radius: 2px; }
 
+        /* Large screens / desktop */
+        @media (min-width: 1025px) {
+            .slide { padding-top: clamp(2rem, 4vh, 3.5rem); }
+            .nav-zone:hover { background: linear-gradient(to right, rgba(56,189,248,0.04), transparent); }
+            .nav-zone.right:hover { background: linear-gradient(to left, rgba(56,189,248,0.04), transparent); }
+        }
+
         /* Tablet specific adjustments */
         @media (min-width: 768px) and (max-width: 1024px) {
-            .slide { padding: 2.5rem 3rem calc(5rem + var(--safe-bottom)) 3rem; }
+            .slide { padding: 2.5rem 3rem calc(var(--controls-h) + 1.5rem + var(--safe-bottom)) 3rem; }
         }
 
         /* Mobile specific adjustments */
         @media (max-width: 767px) {
             .controls {
-                width: 90%;
+                width: min(92%, 420px);
                 justify-content: space-between;
                 padding: 0.5rem;
             }
@@ -283,26 +330,52 @@
                 font-size: 0.9rem;
                 padding: 0.8rem;
             }
+            .slide-counter { right: 12px; }
+        }
+
+        /* Very small phones (<= 360px) */
+        @media (max-width: 360px) {
+            :root { --controls-h: 4rem; }
+            h1 { font-size: 1.25rem; }
+            ul { padding-left: 1rem; }
+        }
+
+        /* Short/wide viewports (landscape phones): keep content usable without scroll traps */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .slide { padding-bottom: calc(var(--controls-h) + 0.5rem + var(--safe-bottom)); }
+            h1 { margin-bottom: 0.8rem; padding-bottom: 0.4rem; }
+            h2 { margin-top: 0.8rem; margin-bottom: 0.3rem; }
+        }
+
+        /* Respect users who prefer reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            .slide,
+            .progress-bar,
+            button {
+                transition: none;
+            }
         }
     </style>
 </head>
 <body>
 
-    <div class="slide-counter" id="slideCounter">1 / 12</div>
+    <div class="slide-counter" id="slideCounter" aria-live="polite">1 / 12</div>
 
-    <div class="nav-zone left" id="navLeft"></div>
-    <div class="nav-zone right" id="navRight"></div>
-
-    <div class="presentation-container" id="presentation">
+    <main class="presentation-container" id="presentation" aria-label="Presentation slides">
         <!-- Slides injected by JS -->
-    </div>
+    </main>
 
-    <div class="controls">
-        <button id="btnPrev">← Prev</button>
-        <button id="btnNext">Next →</button>
-    </div>
+    <!-- Transparent click zones for desktop navigation -->
+    <div class="nav-zone left" id="navLeft" aria-hidden="true"></div>
+    <div class="nav-zone right" id="navRight" aria-hidden="true"></div>
 
-    <div class="progress-container">
+    <nav class="controls" aria-label="Slide navigation">
+        <button id="btnPrev" type="button" aria-label="Previous slide">← Prev</button>
+        <button id="btnNext" type="button" aria-label="Next slide">Next →</button>
+    </nav>
+
+    <div class="progress-container" role="progressbar" aria-label="Presentation progress"
+         aria-valuemin="0" aria-valuemax="100" aria-valuenow="8" id="progressContainer">
         <div class="progress-bar" id="progressBar"></div>
     </div>
 
@@ -394,122 +467,274 @@
             }
         ];
 
-        let currentSlide = 0;
-        const totalSlides = slidesData.length;
-        const presentation = document.getElementById('presentation');
-        const progressBar = document.getElementById('progressBar');
-        const slideCounter = document.getElementById('slideCounter');
-        const btnPrev = document.getElementById('btnPrev');
-        const btnNext = document.getElementById('btnNext');
+        /* ---------------------------------------------------------------- *
+         * Presentation controller (IIFE - no globals leak to window).
+         * Performance notes:
+         *  - Slides are built off-DOM in a DocumentFragment, appended once
+         *  - Only two class toggles per navigation (no O(n) loops)
+         *  - Progress bar animates via transform:scaleX (compositor-only)
+         *  - Touch listeners are passive and scoped to the container;
+         *    viewport width is cached and refreshed on resize
+         * ---------------------------------------------------------------- */
+        (() => {
+            'use strict';
 
-        // Render Slides
-        slidesData.forEach((slide, index) => {
-            const slideEl = document.createElement('div');
-            slideEl.className = `slide ${index === 0 ? 'active' : ''}`;
-            slideEl.innerHTML = `
-                <div class="slide-content">
-                    <h1>${slide.title}</h1>
-                    <h2>The Question</h2>
-                    <p class="question-text">${slide.question}</p>
-                    <h2>The Clinical Reality</h2>
-                    ${slide.reality}
-                    <h2>The Translation</h2>
-                    <div class="translation-box">${slide.translation}</div>
-                    <h2>The Soundbite</h2>
-                    <div class="soundbite-box">${slide.soundbite}</div>
-                </div>
-            `;
-            presentation.appendChild(slideEl);
-        });
+            let currentSlide = -1; // forces first goTo() to apply state
+            const totalSlides = slidesData.length;
 
-        const slideElements = document.querySelectorAll('.slide');
+            const presentation      = document.getElementById('presentation');
+            const progressBar       = document.getElementById('progressBar');
+            const progressContainer = document.getElementById('progressContainer');
+            const slideCounter      = document.getElementById('slideCounter');
+            const btnPrev           = document.getElementById('btnPrev');
+            const btnNext           = document.getElementById('btnNext');
 
-        function updateSlide() {
-            slideElements.forEach((el, index) => {
-                if (index === currentSlide) {
-                    el.classList.add('active');
-                    el.scrollTop = 0; // Reset scroll position on new slide
-                } else {
-                    el.classList.remove('active');
+            /* ---- Render all slides once, then append in a single reflow ---- */
+            const fragment = document.createDocumentFragment();
+            const slideElements = slidesData.map((slide, index) => {
+                const el = document.createElement('section');
+                el.className = 'slide';
+                el.setAttribute('role', 'group');
+                el.setAttribute('aria-roledescription', 'slide');
+                el.setAttribute('aria-label', `Slide ${index + 1} of ${totalSlides}`);
+                el.innerHTML = `
+                    <div class="slide-content">
+                        <h1>${slide.title}</h1>
+                        <h2>The Question</h2>
+                        <p class="question-text">${slide.question}</p>
+                        <h2>The Clinical Reality</h2>
+                        ${slide.reality}
+                        <h2>The Translation</h2>
+                        <div class="translation-box">${slide.translation}</div>
+                        <h2>The Soundbite</h2>
+                        <div class="soundbite-box">${slide.soundbite}</div>
+                    </div>`;
+                fragment.appendChild(el);
+                return el;
+            });
+            presentation.appendChild(fragment);
+
+            /* ---- State update (single write path) ---- */
+            let activeEl = null;
+
+            function goTo(index) {
+                if (index === currentSlide) return;
+                if (index < 0 || index >= totalSlides) return;
+
+                if (activeEl) {
+                    activeEl.classList.remove('active');
+                    activeEl.inert = true;   // remove hidden slides from tab order
+                }
+
+                currentSlide = index;
+                activeEl = slideElements[index];
+                activeEl.classList.add('active');
+                activeEl.inert = false;
+                activeEl.scrollTop = 0;      // reset scroll position on new slide
+
+                const fraction = (currentSlide + 1) / totalSlides;
+                progressBar.style.transform = `scaleX(${fraction})`;
+                progressContainer.setAttribute('aria-valuenow', String(Math.round(fraction * 100)));
+                slideCounter.textContent = `${currentSlide + 1} / ${totalSlides}`;
+
+                btnPrev.disabled = currentSlide === 0;
+                btnNext.disabled = currentSlide === totalSlides - 1;
+            }
+
+            const nextSlide = () => goTo(currentSlide + 1);
+            const prevSlide = () => goTo(currentSlide - 1);
+
+            /* ---- Buttons ---- */
+            btnNext.addEventListener('click', nextSlide);
+            btnPrev.addEventListener('click', prevSlide);
+
+            /* ---- Keyboard ---- */
+            document.addEventListener('keydown', (e) => {
+                // Let Space/Enter activate a focused button natively
+                if (e.target instanceof HTMLButtonElement && (e.key === ' ' || e.key === 'Enter')) return;
+                switch (e.key) {
+                    case 'ArrowRight':
+                    case ' ':
+                        e.preventDefault();
+                        nextSlide();
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        prevSlide();
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        goTo(0);
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        goTo(totalSlides - 1);
+                        break;
                 }
             });
-            
-            const progress = ((currentSlide + 1) / totalSlides) * 100;
-            progressBar.style.width = `${progress}%`;
-            slideCounter.textContent = `${currentSlide + 1} / ${totalSlides}`;
 
-            btnPrev.disabled = currentSlide === 0;
-            btnNext.disabled = currentSlide === totalSlides - 1;
-        }
+            /* ---- Unified pointer gestures (touch + mouse) ----
+             *  - Swipe left / drag left  -> next slide
+             *  - Swipe right / drag right -> previous slide
+             *  - Tap / click right half  -> next;  left half -> previous
+             *  - Vertical scrolling inside a slide is never hijacked:
+             *    if the slide is scrollable and not at the boundary in the
+             *    swipe direction, the gesture is ignored (no rubber-band
+             *    page turns while reading).
+             *  - Edge exclusion zone prevents clashing with system
+             *    back-gestures on mobile.
+             * Uses Pointer Events so one code path covers touch, pen and
+             * mouse (drag-to-navigate works on desktop too). Listeners are
+             * registered only when Pointer Events are supported; otherwise
+             * keyboard/buttons remain fully functional.
+             */
+            const SWIPE_THRESHOLD = 40;   // px of horizontal travel to count as a swipe
+            const TAP_SLOP        = 15;   // max movement (px) still considered a tap/click
+            const TAP_DURATION    = 350;  // ms
+            const EDGE_ZONE       = 24;   // px from screen edges ignored (system gestures)
 
-        function nextSlide() {
-            if (currentSlide < totalSlides - 1) {
-                currentSlide++;
-                updateSlide();
+            let viewportW = window.innerWidth;
+            window.addEventListener('resize', () => {
+                viewportW = window.innerWidth;
+            }, { passive: true });
+
+            /* Track input modality so hover affordances / click zones only
+               apply to mouse users (prevents sticky hover on touch devices). */
+            const mediaHover = window.matchMedia('(hover: hover) and (pointer: fine)');
+            function setModality(isMouse) {
+                document.body.classList.toggle('has-mouse', isMouse);
             }
-        }
-
-        function prevSlide() {
-            if (currentSlide > 0) {
-                currentSlide--;
-                updateSlide();
+            if (typeof mediaHover.addEventListener === 'function') {
+                mediaHover.addEventListener('change', (e) => setModality(e.matches));
             }
-        }
+            setModality(mediaHover.matches);
 
-        // Button Listeners
-        btnNext.addEventListener('click', (e) => { e.stopPropagation(); nextSlide(); });
-        btnPrev.addEventListener('click', (e) => { e.stopPropagation(); prevSlide(); });
-
-        // Keyboard Listeners
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowRight' || e.key === ' ') {
-                e.preventDefault();
-                nextSlide();
-            } else if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                prevSlide();
+            /* Allow page-turn swipes only when the user isn't clearly
+               mid-vertical-scroll inside a slide (reading mode). */
+            function atScrollBoundary(el) {
+                if (!el) return true;
+                const scrollable = el.scrollHeight - el.clientHeight > 2;
+                if (!scrollable) return true;
+                const atTop = el.scrollTop <= 0;
+                const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+                return atTop || atBottom;
             }
-        });
 
-        // Advanced Touch & Tap Listeners for Mobile/Tablet
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let touchStartTime = 0;
+            if ('PointerEvent' in window) {
+                let pid = null;           // active pointerId (single-pointer tracking)
+                let startX = 0, startY = 0, startT = 0;
+                let axis = null;          // 'x' once horizontal intent is clear
 
-        document.addEventListener('touchstart', (e) => {
-            touchStartX = e.changedTouches[0].screenX;
-            touchStartY = e.changedTouches[0].screenY;
-            touchStartTime = Date.now();
-        }, { passive: true });
+                const withinEdgeZone = (x) => x < EDGE_ZONE || x > viewportW - EDGE_ZONE;
 
-        document.addEventListener('touchend', (e) => {
-            const touchEndX = e.changedTouches[0].screenX;
-            const touchEndY = e.changedTouches[0].screenY;
-            const diffX = touchEndX - touchStartX;
-            const diffY = touchEndY - touchStartY;
-            const timeDiff = Date.now() - touchStartTime;
+                presentation.addEventListener('pointerdown', (e) => {
+                    if (pid !== null) return;                 // ignore multi-touch extras
+                    if (e.pointerType === 'mouse' && e.button !== 0) return;
+                    pid = e.pointerId;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startT = performance.now();
+                    axis = null;
+                }, { passive: true });
 
-            const absDiffX = Math.abs(diffX);
-            const absDiffY = Math.abs(diffY);
+                presentation.addEventListener('pointermove', (e) => {
+                    if (e.pointerId !== pid) return;
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    // Once the pointer clearly travels horizontally, capture it
+                    // so the browser stops treating it as a vertical pan/select.
+                    if (axis === null && Math.abs(dx) > TAP_SLOP && Math.abs(dx) > Math.abs(dy)) {
+                        axis = 'x';
+                        try { presentation.setPointerCapture(pid); } catch (_) {}
+                    }
+                }, { passive: true });
 
-            // Swipe detection (horizontal movement > vertical, and > 40px)
-            if (absDiffX > 40 && absDiffX > absDiffY) {
-                if (diffX < 0) nextSlide(); // Swipe Left -> Next
-                else prevSlide(); // Swipe Right -> Prev
-            } 
-            // Tap detection (minimal movement, short duration)
-            else if (absDiffX < 15 && absDiffY < 15 && timeDiff < 300) {
-                const screenWidth = window.innerWidth;
-                if (touchEndX > screenWidth / 2) {
-                    nextSlide();
-                } else {
-                    prevSlide();
+                function endGesture(e) {
+                    if (e.pointerId !== pid) return;
+                    const id = pid;
+                    pid = null;
+                    try { presentation.releasePointerCapture(id); } catch (_) {}
+
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    const absX = Math.abs(dx);
+                    const absY = Math.abs(dy);
+                    const elapsed = performance.now() - startT;
+
+                    // A horizontal gesture is only accepted when the pointer
+                    // was captured mid-move (axis === 'x'). This prevents a
+                    // diagonal scroll that happens to end with a large X
+                    // delta from accidentally turning the page.
+                    if (axis === 'x' && absX > SWIPE_THRESHOLD) {
+                        // Horizontal swipe/drag: left -> next, right -> previous.
+                        // Skip while vertically mid-scroll inside a slide.
+                        if (atScrollBoundary(activeEl)) {
+                            if (dx < 0) nextSlide(); else prevSlide();
+                        }
+                    } else if (axis === null &&
+                               absX < TAP_SLOP && absY < TAP_SLOP && elapsed < TAP_DURATION) {
+                        // Tap / click: right half -> next, left half -> previous.
+                        // Ignore taps that started in the system edge zone and
+                        // taps on interactive controls (buttons already handle them).
+                        const target = e.target;
+                        const onControl = target instanceof Element &&
+                                          target.closest('.controls, button, a');
+                        if (!onControl && !withinEdgeZone(startX)) {
+                            if (startX > viewportW / 2) nextSlide(); else prevSlide();
+                        }
+                    }
                 }
-            }
-        }, { passive: true });
 
-        // Initialize
-        updateSlide();
+                presentation.addEventListener('pointerup', endGesture, { passive: true });
+                presentation.addEventListener('pointercancel', (e) => {
+                    if (e.pointerId === pid) pid = null;
+                }, { passive: true });
+
+                /* Suppress the synthetic mouse click that follows a touch tap,
+                   so nav-zone click handlers only ever fire for real mouse
+                   users (prevents double-advance on touch devices). */
+                let suppressClickUntil = 0;
+                presentation.addEventListener('touchend', () => {
+                    suppressClickUntil = performance.now() + 700;
+                }, { passive: true });
+                const isPhantomClick = () => performance.now() < suppressClickUntil;
+                document.getElementById('navLeft').addEventListener('click', (e) => {
+                    if (!isPhantomClick()) prevSlide();
+                });
+                document.getElementById('navRight').addEventListener('click', (e) => {
+                    if (!isPhantomClick()) nextSlide();
+                });
+            } else {
+                /* Legacy fallback (no Pointer Events): simple touch swipe/tap */
+                let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+                presentation.addEventListener('touchstart', (e) => {
+                    const t = e.changedTouches[0];
+                    touchStartX = t.clientX;
+                    touchStartY = t.clientY;
+                    touchStartTime = Date.now();
+                }, { passive: true });
+                presentation.addEventListener('touchend', (e) => {
+                    const t = e.changedTouches[0];
+                    const diffX = t.clientX - touchStartX;
+                    const diffY = t.clientY - touchStartY;
+                    const absX = Math.abs(diffX);
+                    const absY = Math.abs(diffY);
+                    if (absX > SWIPE_THRESHOLD && absX > absY) {
+                        if (diffX < 0) nextSlide(); else prevSlide();
+                    } else if (absX < TAP_SLOP && absY < TAP_SLOP &&
+                               (Date.now() - touchStartTime) < TAP_DURATION) {
+                        if (t.clientX > viewportW / 2) nextSlide(); else prevSlide();
+                    }
+                }, { passive: true });
+
+                /* ---- Desktop click zones (left/right halves of the screen) ---- */
+                document.getElementById('navLeft').addEventListener('click', prevSlide);
+                document.getElementById('navRight').addEventListener('click', nextSlide);
+            }
+
+            /* ---- Initialize ---- */
+            goTo(0);
+        })();
     </script>
 </body>
 </html>
