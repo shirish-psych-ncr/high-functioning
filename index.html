@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0f172a">
+    <title>The Hidden Cost of High Performance</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-accent: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --accent-color: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.15);
+            --soundbite-bg: rgba(56, 189, 248, 0.08);
+            --soundbite-border: #38bdf8;
+            --translation-bg: rgba(148, 163, 184, 0.08);
+            --translation-border: #94a3b8;
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            height: 100dvh;
+            overflow: hidden;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Navigation Zones */
+        .nav-zone {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 50%;
+            z-index: 10;
+            cursor: pointer;
+        }
+        .nav-zone.left { left: 0; }
+        .nav-zone.right { right: 0; }
+
+        /* Slide Container */
+        .presentation-container {
+            position: relative;
+            width: 100%;
+            height: 100dvh;
+            overflow: hidden;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100dvh;
+            padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 4rem) calc(6rem + var(--safe-bottom)) clamp(1rem, 4vw, 4rem);
+            display: none;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateX(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            overflow-y: auto;
+            overscroll-behavior-y: contain;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+            z-index: 1;
+        }
+
+        .slide.active {
+            display: flex;
+            opacity: 1;
+            transform: translateX(0);
+            z-index: 5;
+        }
+
+        .slide-content {
+            max-width: 1100px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: clamp(1.4rem, 4vw, 2.2rem);
+            font-weight: 700;
+            color: var(--accent-color);
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--bg-accent);
+            padding-bottom: 0.8rem;
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+        }
+
+        h2 {
+            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+            font-weight: 600;
+            color: var(--accent-color);
+            margin-top: 1.2rem;
+            margin-bottom: 0.4rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: clamp(1rem, 3vw, 1.2rem);
+            font-style: italic;
+            color: var(--text-secondary);
+            margin-bottom: 1.2rem;
+            line-height: 1.5;
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 1.2rem;
+        }
+
+        li {
+            margin-bottom: 0.4rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            position: relative;
+            font-size: clamp(0.9rem, 2.5vw, 1.05rem);
+        }
+
+        li::before {
+            content: "•";
+            color: var(--accent-color);
+            position: absolute;
+            left: -1rem;
+            font-weight: bold;
+        }
+
+        ul ul { padding-left: 1rem; }
+        ul ul li::before { content: "-"; color: var(--text-muted); }
+        ul ul ul { padding-left: 1rem; }
+        ul ul ul li::before { content: "◦"; color: var(--text-muted); font-size: 0.8rem; }
+
+        strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Special Sections */
+        .translation-box {
+            background: var(--translation-bg);
+            border-left: 4px solid var(--translation-border);
+            padding: 1rem 1.2rem;
+            margin: 1.2rem 0;
+            border-radius: 0 8px 8px 0;
+            font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+            color: var(--text-primary);
+            font-style: italic;
+            line-height: 1.6;
+        }
+
+        .soundbite-box {
+            background: var(--soundbite-bg);
+            border: 1px solid var(--soundbite-border);
+            padding: 1.2rem;
+            margin-top: 1.5rem;
+            border-radius: 8px;
+            font-size: clamp(1rem, 3vw, 1.25rem);
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+            box-shadow: 0 0 20px var(--accent-glow);
+            line-height: 1.5;
+        }
+
+        /* Controls */
+        .controls {
+            position: fixed;
+            bottom: calc(10px + var(--safe-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 0.8rem;
+            z-index: 20;
+            background: rgba(15, 23, 42, 0.9);
+            padding: 0.6rem 1rem;
+            border-radius: 30px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--bg-accent);
+        }
+
+        button {
+            background: var(--bg-accent);
+            color: var(--text-primary);
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover, button:active {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            background: var(--bg-accent);
+            color: var(--text-muted);
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--bg-accent);
+            z-index: 20;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .slide-counter {
+            position: fixed;
+            top: calc(15px + env(safe-area-inset-top, 0px));
+            right: 20px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            z-index: 20;
+            font-weight: 600;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 4px 10px;
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Scrollbar styling */
+        .slide::-webkit-scrollbar { width: 4px; }
+        .slide::-webkit-scrollbar-track { background: transparent; }
+        .slide::-webkit-scrollbar-thumb { background: var(--bg-accent); border-radius: 2px; }
+
+        /* Tablet specific adjustments */
+        @media (min-width: 768px) and (max-width: 1024px) {
+            .slide { padding: 2.5rem 3rem calc(5rem + var(--safe-bottom)) 3rem; }
+        }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 767px) {
+            .controls {
+                width: 90%;
+                justify-content: space-between;
+                padding: 0.5rem;
+            }
+            button {
+                flex: 1;
+                font-size: 0.9rem;
+                padding: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="slide-counter" id="slideCounter">1 / 12</div>
+
+    <div class="nav-zone left" id="navLeft"></div>
+    <div class="nav-zone right" id="navRight"></div>
+
+    <div class="presentation-container" id="presentation">
+        <!-- Slides injected by JS -->
+    </div>
+
+    <div class="controls">
+        <button id="btnPrev">← Prev</button>
+        <button id="btnNext">Next →</button>
+    </div>
+
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <script>
+        const slidesData = [
+            {
+                title: "Slide 1: The Core Paradox",
+                question: "Why is the paradox of \"high output, invisible distress\" so common among high achievers?",
+                reality: `<ul><li><strong>Compensatory Hypertrophy of the Will</strong><ul><li>heavy mental defenses maintain a flawless outward mask</li><li>defining sign of high-functioning mood and anxiety disorders</li></ul></li><li><strong>Allostatic Overload</strong><ul><li>brain's alarm system stuck in the "on" position</li><li>runs on stress hormones (cortisol, adrenaline) as artificial fuel</li><li>borrows energy from future biological capacity</li></ul></li></ul>`,
+                translation: "\"When output stays high, distress can stay invisible. Your brain deploys emergency reserves to keep the lights on while the machinery runs on fumes.\"",
+                soundbite: "\"We must decouple observed competence from internal stability. You can be highly functional and simultaneously in a state of severe psychological depletion.\""
+            },
+            {
+                title: "Slide 2: The Cost of a Full Calendar (The Hidden Tax)",
+                question: "How does this hidden cognitive tax typically show up clinically?",
+                reality: `<ul><li><strong>Attentional Residue and Mental Fragmentation</strong><ul><li>rechecking, switching tasks, and holding unfinished work trap brainpower</li><li>chronic multitasking degrades sustained attention networks and working memory</li></ul></li><li><strong>Default Mode Network (DMN) Hyperactivity</strong><ul><li>unfinished mental loops prevent deep, slow-wave sleep</li><li>halts the brain's nightly glymphatic cleaning process</li><li>creates a massive metabolic drain disguised as rest</li></ul></li></ul>`,
+                translation: "\"You aren't just losing minutes to task-switching. The brain pays a 'switching penalty' that slowly degrades your cognitive endurance, and the bill arrives after the work is done.\"",
+                soundbite: "\"The cost isn't measured in lost hours; it is measured in the progressive degradation of your sustained focus.\""
+            },
+            {
+                title: "Slide 3: Rationalization vs. Noticing",
+                question: "How do we move from rationalizing stress to actually noticing it?",
+                reality: `<ul><li><strong>Identity-Protective Cognition</strong><ul><li>core self-worth fused entirely with professional output</li><li>psychological distress processed as an existential threat, not a logistical issue</li></ul></li><li><strong>Functional Denial and Baseline Drift</strong><ul><li>coping mechanisms (overwork, perfectionism) are externally rewarded</li><li>gradual stress adaptation recalibrates the brain's baseline</li><li>"just a busy period" becomes a permanent excuse for declining mental health</li></ul></li></ul>`,
+                translation: "\"Name the changes you have been rationalizing. Admitting you are struggling feels like a threat to your core self, but ignoring it guarantees a steeper decline.\"",
+                soundbite: "\"You rationalize the distress because acknowledging it requires temporarily dismantling the very identity that has made you successful.\""
+            },
+            {
+                title: "Slide 4: Symptoms Looking Like Productivity",
+                question: "How do clinical symptoms wear the mask of productivity?",
+                reality: `<ul><li><strong>Pathological Accommodation</strong><ul><li>workplace rewards maladaptive coping, shrinking the margin of error to zero</li></ul></li><li><strong>Clinical Presentations Masked as Diligence</strong><ul><li><strong>Anxiety:</strong> overpreparation, repeated reassurance, difficulty switching off</li><li><strong>Depression:</strong> delivering the work while pleasure, energy, and connection steadily shrink</li><li><strong>OCD:</strong> intrusive doubts followed by checking or mental rituals to briefly reduce distress</li><li><strong>Stress Overload:</strong> irritability, poor sleep, and a sense that every request is urgent</li></ul></li></ul>`,
+                translation: "\"Competence at work does not tell the whole clinical story. You might be delivering the work, but at the cost of your pleasure, energy, and connection.\"",
+                soundbite: "\"If your diligence is fueled by a relentless, internal dread of making a mistake rather than a genuine drive for excellence, that is not productivity. That is a compulsion.\""
+            },
+            {
+                title: "Slide 5: Four Approaches, Four Distinct Jobs",
+                question: "How do these treatment approaches practically work at a neurological level?",
+                reality: `<ul><li>Treatment follows assessment; the right approach depends on the condition and the person</li><li><strong>Cognitive Behavioural Therapy (CBT)</strong><ul><li>builds cognitive flexibility in the prefrontal cortex</li><li>tests unhelpful predictions and changes avoidance or safety behaviours</li></ul></li><li><strong>Behavioural Activation</strong><ul><li>manually jumpstarts a stalled dopaminergic reward system</li><li>rebuilds meaningful activity when low mood has narrowed the day</li></ul></li><li><strong>Exposure and Response Prevention (ERP)</strong><ul><li>forces inhibitory learning in the amygdala</li><li>practises facing uncertainty without doing the compulsion that maintains the cycle</li></ul></li><li><strong>Medication</strong><ul><li>discussed when symptoms, severity, or patient preference warrant it, often alongside therapy</li></ul></li></ul>`,
+                translation: "\"We don't just offer vague support. We target specific neural pathways to rewire how your brain processes threat, reward, and uncertainty.\"",
+                soundbite: "\"Effective treatment is not about 'thinking positive.' It is about systematically retraining maladaptive neural circuits through targeted, evidence-based protocols.\""
+            },
+            {
+                title: "Slide 6: A Balance Sheet for the Mind (Finite Capacity)",
+                question: "Why is 'finite capacity' so difficult for high achievers to accept?",
+                reality: `<ul><li><strong>Synaptic Homeostasis</strong><ul><li>neuroplasticity requires synaptic downscaling during deep, uninterrupted sleep</li><li>without protected rest, the brain cannot consolidate adaptive learning or problem-solving</li></ul></li><li><strong>Blunted Interoception</strong><ul><li>brain stops noticing physical warning signs (racing heart, shallow breathing, hunger)</li><li>neurochemistry actively masks physiological damage until abrupt failure</li></ul></li></ul>`,
+                translation: "\"Capacity is finite, even when ambition is not. Chronic uncertainty, sleep disruption, and constant availability drain it; protected sleep and manageable demands restore it.\"",
+                soundbite: "\"Neuroplasticity requires rest. Without synaptic downscaling during sleep, you are actively degrading the cognitive machinery you rely on to perform.\""
+            },
+            {
+                title: "Slide 7: What Coordinated Care Should Provide",
+                question: "Why is building a 'formulation' so valuable for someone who wants a quick fix?",
+                reality: `<ul><li>Mind Grace Neuropsychiatric Clinic brings psychiatric and psychological perspectives together</li><li><strong>Formulation as a Dynamic Systems Model</strong><ul><li>maps the complex web of biology, thoughts, and environment over time</li></ul></li><li><strong>The 4 Ps Framework</strong><ul><li>Predisposing (historical vulnerabilities)</li><li>Precipitating (immediate triggers)</li><li>Perpetuating (ongoing stressors keeping it going)</li><li>Protective (personal strengths and support)</li></ul></li></ul>`,
+                translation: "\"A diagnosis just names the problem. A formulation is a dynamic systems model that shows us exactly which variables are interacting to keep you stuck.\"",
+                soundbite: "\"We do not treat static labels. We build a dynamic model of your specific psychological ecosystem to apply surgical precision to the root cause.\""
+            },
+            {
+                title: "Slide 8: The Advantage of Asking Earlier",
+                question: "Why do high achievers dismiss early signals like sleep changes?",
+                reality: `<ul><li><strong>Failure to Recognize the Prodromal Phase</strong><ul><li>early signals: sleep changes, persistent rumination, withdrawal, compulsive checking, rising effort for routine tasks</li><li>ignoring the prodrome leads to a sudden crash requiring disruptive intervention</li></ul></li><li><strong>Baseline Drift</strong><ul><li>gradual shift where "abnormal" slowly becomes the new chronic standard of functioning</li></ul></li></ul>`,
+                translation: "\"An assessment can distinguish temporary strain from a treatable condition. You do not need to wait until work collapses.\"",
+                soundbite: "\"Waiting for total collapse is not resilience; it is a failure of preventive medicine. We intervene in the prodrome to protect your long-term trajectory.\""
+            },
+            {
+                title: "Slide 9: What Recovery Can Actually Mean",
+                question: "How do you help them measure recovery in new ways rather than just output?",
+                reality: `<ul><li><strong>Restoring Psychological Flexibility</strong><ul><li>ability to switch gears and adapt without panicking</li><li>expanded ability to disengage from work without a threat-response spike</li></ul></li><li><strong>Value-Congruent Living and Function</strong><ul><li>more reliable sleep, concentration, and room for relationships outside work</li><li>aligning daily choices with personal values, not just work goals</li></ul></li></ul>`,
+                translation: "\"Measure more than output. Recovery is the transition from a rigid, survival-driven existence to a flexible life with actual bandwidth for things unrelated to your job title.\"",
+                soundbite: "\"True recovery is measured by the restoration of psychological flexibility: the ability to disengage from work without experiencing a spike in threat-response.\""
+            },
+            {
+                title: "Slide 10: The People Behind the Care (Multidisciplinary Team)",
+                question: "Why is it valuable to have psychiatric and psychological perspectives working together?",
+                reality: `<ul><li><strong>Clinical Leadership at Mind Grace</strong><ul><li>Dr. Anita Sharma and Dr. Sana Firdos</li></ul></li><li><strong>Reduction of Clinical Noise and Iatrogenic Harm</strong><ul><li>fragmented care creates contradictory directives and missed interactions</li></ul></li><li><strong>Coherent Therapeutic Alliance</strong><ul><li>a unified team ensures pharmacological and psychological interventions are mechanically aligned</li><li>working in the exact same biomechanical direction is the primary predictor of success</li></ul></li></ul>`,
+                translation: "\"Care is not a solo act. A multidisciplinary team connects assessment, treatment, and follow-up seamlessly around one person.\"",
+                soundbite: "\"Fragmented care creates conflicting signals. We provide a unified, coherent treatment architecture where every modality reinforces the other.\""
+            },
+            {
+                title: "Slide 11: A Practical Check-in Before Burnout",
+                question: "Why is this two-week tracking exercise so clinically powerful?",
+                reality: `<ul><li><strong>Behavioral Phenotyping</strong><ul><li>tracks actual behavior (sleep, mood, anxiety, concentration, time lost to rumination/checking) instead of unreliable feelings</li></ul></li><li><strong>Ecological Momentary Assessment (EMA)</strong><ul><li>real-time logging in natural, everyday environments</li></ul></li><li><strong>Recall Bias Mitigation</strong><ul><li>objective timelines counteract the brain's tendency to misremember or selectively forget past emotional states</li></ul></li></ul>`,
+                translation: "\"Put a review point on the calendar. Notice if the change persists across lighter days or requires more effort to conceal, then decide from evidence, not emotion.\"",
+                soundbite: "\"Do not rely on subjective memory during high stress. Rely on empirical data. Two weeks of tracking replaces emotional guesswork with clinical evidence.\""
+            },
+            {
+                title: "Slide 12: Make the First Appointment Count",
+                question: "Why is giving a high achiever structured preparation helpful for taking that first step?",
+                reality: `<ul><li><strong>Establishes Collaborative Empiricism from Minute One</strong><ul><li>doctor and patient act as a team of investigators testing hypotheses</li></ul></li><li><strong>Cognitive Offloading</strong><ul><li>bypasses anxiety-induced executive dysfunction by providing a clear, external structure</li></ul></li><li><strong>Actionable Next Steps</strong><ul><li>bring three things: what changed, how long it has been happening, what you want to be different</li><li>ask directly: what might be driving this? what are my treatment options? how will we know the plan is helping?</li></ul></li></ul>`,
+                translation: "\"The most effective therapy is a partnership based on data. You bypass the vague 'I'm just stressed' phase and we immediately engage in targeted problem-solving.\"",
+                soundbite: "\"You do not need to have the answers. Bring us the raw data points, and we will immediately engage in collaborative, empirical problem-solving to build your roadmap.\""
+            }
+        ];
+
+        let currentSlide = 0;
+        const totalSlides = slidesData.length;
+        const presentation = document.getElementById('presentation');
+        const progressBar = document.getElementById('progressBar');
+        const slideCounter = document.getElementById('slideCounter');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnNext = document.getElementById('btnNext');
+
+        // Render Slides
+        slidesData.forEach((slide, index) => {
+            const slideEl = document.createElement('div');
+            slideEl.className = `slide ${index === 0 ? 'active' : ''}`;
+            slideEl.innerHTML = `
+                <div class="slide-content">
+                    <h1>${slide.title}</h1>
+                    <h2>The Question</h2>
+                    <p class="question-text">${slide.question}</p>
+                    <h2>The Clinical Reality</h2>
+                    ${slide.reality}
+                    <h2>The Translation</h2>
+                    <div class="translation-box">${slide.translation}</div>
+                    <h2>The Soundbite</h2>
+                    <div class="soundbite-box">${slide.soundbite}</div>
+                </div>
+            `;
+            presentation.appendChild(slideEl);
+        });
+
+        const slideElements = document.querySelectorAll('.slide');
+
+        function updateSlide() {
+            slideElements.forEach((el, index) => {
+                if (index === currentSlide) {
+                    el.classList.add('active');
+                    el.scrollTop = 0; // Reset scroll position on new slide
+                } else {
+                    el.classList.remove('active');
+                }
+            });
+            
+            const progress = ((currentSlide + 1) / totalSlides) * 100;
+            progressBar.style.width = `${progress}%`;
+            slideCounter.textContent = `${currentSlide + 1} / ${totalSlides}`;
+
+            btnPrev.disabled = currentSlide === 0;
+            btnNext.disabled = currentSlide === totalSlides - 1;
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                currentSlide++;
+                updateSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateSlide();
+            }
+        }
+
+        // Button Listeners
+        btnNext.addEventListener('click', (e) => { e.stopPropagation(); nextSlide(); });
+        btnPrev.addEventListener('click', (e) => { e.stopPropagation(); prevSlide(); });
+
+        // Keyboard Listeners
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevSlide();
+            }
+        });
+
+        // Advanced Touch & Tap Listeners for Mobile/Tablet
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+            touchStartTime = Date.now();
+        }, { passive: true });
+
+        document.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].screenX;
+            const touchEndY = e.changedTouches[0].screenY;
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+            const timeDiff = Date.now() - touchStartTime;
+
+            const absDiffX = Math.abs(diffX);
+            const absDiffY = Math.abs(diffY);
+
+            // Swipe detection (horizontal movement > vertical, and > 40px)
+            if (absDiffX > 40 && absDiffX > absDiffY) {
+                if (diffX < 0) nextSlide(); // Swipe Left -> Next
+                else prevSlide(); // Swipe Right -> Prev
+            } 
+            // Tap detection (minimal movement, short duration)
+            else if (absDiffX < 15 && absDiffY < 15 && timeDiff < 300) {
+                const screenWidth = window.innerWidth;
+                if (touchEndX > screenWidth / 2) {
+                    nextSlide();
+                } else {
+                    prevSlide();
+                }
+            }
+        }, { passive: true });
+
+        // Initialize
+        updateSlide();
+    </script>
+</body>
+</html>
